@@ -140,6 +140,7 @@
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800);
 boolean dropInitDisplay=0;
+unsigned int storedValues[3] = {};
 
 
 void setup() {
@@ -162,27 +163,26 @@ void setup() {
 #endif
 }
 
-void commsProtocol(byte x)
+bool commsProtocol(byte x) /returns bool, so an if could check whether or not the storedValues array has the values to process
 {
 	static word buffer;
 	static word process; //figure out how to do conversion from byte data type to int data type
-	static unsigned int storedValues[2];
 	static int bufferSubscript = 0;
 	if (x == 255){
 		//move everything from buffer array to process array and wipe the buffer
 		for (int z = 0; z < 2; z++){
-			process[z] = buffer[z];
-			buffer[z] = 0; //this line wipes the buffer
+			process = buffer;			buffer &= 0b0000000000000000; //this line wipes the buffer
 		}
 		//process the bytes into readable values here
 		int copy = process;
 		storedValues[0] = (copy>>8) & 0b0000000000000111; //8 possible values for section
-		storedValues[1] = (process<<1)>>12; // shifts to "one byte"
-		storedValues[2] = process & 0b0000000011111111;
-		 
+		storedValues[1] = (process<<1)>>12; // shifts so the four split can be read, eliminates reserve char
+		storedValues[2] = process & 0b0000000011111111; //makes color value readable
+		return true;
 	}
 	else {
 		buffer = (buffer<<8) | x; //shift left 8, the OR over x;
+		return false;
 	}
 {
 void loop() {
@@ -191,7 +191,12 @@ void loop() {
   if (Serial.available() > 0) {
     // read the oldest byte in the serial buffer:
     byte incomingByte = Serial.read();
-    paramEval(incomingByte);
+	if(commsProtocol(incomingByte) == true){
+		paramEval(storedValues[0], storedValues[1], storedValues[2]);
+	}
+	else {
+		//do nothing
+	}
   }
 #endif
   delay(10);
@@ -200,63 +205,41 @@ void loop() {
 
 // This function always processes input for 5 input ranges/display sections
 // MAC: low priority: Look at pre-compile directives to only run the code for the defined number of sections
-void paramEval(unsigned int incomingByte) {
-  int section=9;
-  // Determine whether the input was in range and if so, what section should be affected by the input
-  // Also normalize it to a small integer to make easier determination of the color to be assigned
-  if ( incomingByte >= 48 && incomingByte <= 57 ) {  // ASCII range for numerals 0-9
-    incomingByte = incomingByte - 48;
-    section=0;
-  }
-  else if ( incomingByte >= 97 && incomingByte <= 109 ) { // ASCII range for lower-case letters a-m
-    incomingByte = incomingByte - 97;
-    section=1;
-  }
-  else if ( incomingByte >= 65 && incomingByte <= 77 ) {  // ASCII range for upper-case letters A-M
-    incomingByte = incomingByte - 65;
-    section=2;
-  }
-  else if ( incomingByte >= 110 && incomingByte <= 122 ) { // ASCII range for lower-case letters n-z
-    incomingByte = incomingByte - 110;
-    section=3;
-  }
-  else if ( incomingByte >= 78 && incomingByte <= 90 ) {  // ASCII range for upper-case letters N-Z
-    incomingByte = incomingByte - 78;
-    section=4;
-  }
+void paramEval(unsigned int section, unsigned int effect, unsigned int color) {
   // Figure out which color should be assigned and set the designated section to that color
-  switch(incomingByte) {
+  //determine effect after section and color assignment because of the black or white effects that will be required due to lack of three byte RGB value
+  switch(section) {
   case 0:
-    setSection(section, COLOR0);
+    setSection(section, color);
     break;
   case 1: 
-    setSection(section, COLOR1);
+    setSection(section, color);
     break;
   case 2: 
-    setSection(section, COLOR2);
+    setSection(section, color);
     break;
   case 3: 
-    setSection(section, COLOR3);
+    setSection(section, color);
     break;
   case 4: 
-    setSection(section, COLOR4);
+    setSection(section, color);
     break;
   case 5: 
-    setSection(section, COLOR5);
+    setSection(section, color);
     break;
   case 6: 
-    setSection(section, COLOR6);
+    setSection(section, color);
     break;
   case 7: 
-    setSection(section, COLOR7);
+    setSection(section, color);
     break;
   case 8: 
-    setSection(section, COLOR8);
+    setSection(section, color);
     break;
   case 9: 
-    setSection(section, COLOR9);
+    setSection(section, color);
     break;
-  case 12:
+  case 12: //what is this case for
     if (section == 4) { // This corresponds to a 'Z' character being received
       dropInitDisplay=0;
       doInitDisplay();
