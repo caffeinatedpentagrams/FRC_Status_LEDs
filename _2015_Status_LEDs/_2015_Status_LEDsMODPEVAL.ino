@@ -171,7 +171,8 @@ bool commsProtocol(byte x) /returns bool, so an if could check whether or not th
 	if (x == 255){
 		//move everything from buffer array to process array and wipe the buffer
 		for (int z = 0; z < 2; z++){
-			process = buffer;			buffer &= 0b0000000000000000; //this line wipes the buffer
+			process = buffer;			
+			buffer &= 0b0000000000000000; //this line wipes the buffer
 		}
 		//process the bytes into readable values here
 		int copy = process;
@@ -184,7 +185,7 @@ bool commsProtocol(byte x) /returns bool, so an if could check whether or not th
 		buffer = (buffer<<8) | x; //shift left 8, the OR over x;
 		return false;
 	}
-{
+}
 void loop() {
 #ifdef UART  
   // see if there's incoming serial data:
