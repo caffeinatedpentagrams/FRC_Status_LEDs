@@ -138,9 +138,10 @@
 #include <Wire.h>
 #endif
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800); //initializes the strip, as seen in example code
 boolean dropInitDisplay=0;
-unsigned int storedValues[3] = {};
+unsigned int storedValues[3] = {}; //stores values from communcation protocol
+unsigned int storeRGB[3] = {}; //values stored in this array by function getRGB(), order R, G, B
 
 
 void setup() {
@@ -186,6 +187,47 @@ bool commsProtocol(byte x) /returns bool, so an if could check whether or not th
 		return false;
 	}
 }
+
+void getRGB(unsigned int x) //where x is the color val, function converts single value to RGB, three values, maps to outside of color wheel
+{ 
+	if (0<x && x<42){
+		storeRGB[0] = 255;
+		storeRGB[1] = 6*x;
+		storeRGB[2] = 0;
+	}
+	else if (42<x && x<85){
+		storeRGB[0] = 255-6*(x-42);
+		storeRGB[1] = 255;
+		storeRGB[2] = 0;
+	}
+	else if (85<x && x<127){
+		storeRGB[0] = 0;
+		storeRGB[1] = 255;
+		storeRGB[2] = 6*(x-85);
+	}
+	else if (127<x && x<170){
+		storeRGB[0] = 0;
+		storeRGB[1] = 255-6*(x-127);
+		storeRGB[2] = 255;
+	}
+	else if (170<x && x<212){
+		storeRGB[0] = 6*(x-170);
+		storeRGB[1] = 0;
+		storeRGB[2] = 255;
+	}
+	else if (212<x && x<255){
+		storeRGB[0] = 255;
+		storeRGB[1] = 0;
+		storeRGB[2] = 255-6*(x-212);
+	}
+	else{
+		storeRGB[0] = 0;
+		storeRGB[1] = 0;
+		storeRGB[2] = 0;
+		//this is incase of impossible error, sets to off/black, but error should never be reached because of inability to exceed 255 in 8 bits
+	{
+}
+
 void loop() {
 #ifdef UART  
   // see if there's incoming serial data:
@@ -202,6 +244,56 @@ void loop() {
 #endif
   delay(10);
   strip.show();
+}
+//Function to set effect, should be called after everything else in paramEval because it contains overrides of color and section values depending on effect
+void setEffect(unsigned int effect)
+{
+	switch(effect){
+		case 0:
+			
+			break; //so only sets section and color
+		case 1:
+			//flow flash, 2x per second
+			break;
+		case 2:
+			//fast flash, 6x per second
+			break;
+		case 3:
+			//red-yellow-green gradient, overrides color val
+			break;
+		case 4:
+			//magenta-white gradient
+			break;
+		case 9:
+			//up-down zip
+			break;
+		case 10:
+			//Single Direction/FollowingZip
+			break;
+		case 11:
+			//Theatre Chase
+			break;
+		case 12:
+			//Rainbow Sweep
+			break;
+		case 13:
+			//Sleep breathing
+			break;
+		case 14:
+			//sound Meter
+			break;
+		case 15:
+			//Cylon eye
+			break:
+		case default:
+			break;
+	}
+}
+
+void colorWipe(unsigned int section, unsigned int color) //call getRGB inside here
+{//array of strips? section number corresponds to (data struct) array of strips, so strips[section].Color
+	getRGB(color); //writes to storeRGB
+	strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]); //sets strip?
 }
 
 // This function always processes input for 5 input ranges/display sections
@@ -246,6 +338,8 @@ void paramEval(unsigned int section, unsigned int effect, unsigned int color) {
       doInitDisplay();
     }
     break;
+  case default:
+	break;
   }
 }
 
@@ -259,6 +353,8 @@ void setSection (int section, uint32_t color) {
     }
   }
 }
+
+
 
 void initDividers() {
   for(int i=0; i<NPIXEL; i++) {
