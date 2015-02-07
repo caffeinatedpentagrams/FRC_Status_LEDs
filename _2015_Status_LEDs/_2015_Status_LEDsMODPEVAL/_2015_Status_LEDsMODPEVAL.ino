@@ -141,7 +141,7 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800); //initializes the strip, as seen in example code
 boolean dropInitDisplay=0;
 unsigned int storedValues[3] = {}; //stores values from communcation protocol
-unsigned int storeRGB[3] = {}; //values stored in this array by function getRGB(), order R, G, B
+//unsigned int storeRGB[3] = {}; //values stored in this array by function getRGB(), order R, G, B
 //4 strips, one on each side of robot. Strip does not need to be specified, all strips show the same output
 //Section needs to be specified on each strip, section is an arbitrary number which forty is a multiple of, this should be done in the setSection() function already
 
@@ -166,7 +166,7 @@ void setup() {
 #endif
 }
 
-bool commsProtocol(byte x) /returns bool, so an if could check whether or not the storedValues array has the values to process
+boolean commsProtocol(byte x) //returns boolean, so an if could check whether or not the storedValues array has the values to process
 {
 	static word buffer;
 	static word process; //figure out how to do conversion from byte data type to int data type
@@ -190,49 +190,49 @@ bool commsProtocol(byte x) /returns bool, so an if could check whether or not th
 	}
 }
 
-unsigned int getRGB(unsigned int x) //where x is the color val, function converts single value to RGB, three values, maps to outside of color wheel
+uint32_t getRGB(unsigned int x) //where x is the color val, function converts single value to RGB, three values, maps to outside of color wheel
 { //wrote more effecient version that travels in a "color triangle" but still gets an accurate color in
 	if (0<=x && x<=42){
-		storeRGB[0] = 255;
-		storeRGB[1] = 6*x;
-		storeRGB[2] = 0;
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 255;
+		//storeRGB[1] = 6*x;
+		//storeRGB[2] = 0;
+                return (255<<24|(6*x)<<16|0<<8|255);
 	}
 	else if (42<x && x<=85){
-		storeRGB[0] = 255-6*(x-42);
-		storeRGB[1] = 255;
-		storeRGB[2] = 0;
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 255-6*(x-42);
+		//storeRGB[1] = 255;
+		//storeRGB[2] = 0;
+                return ((255-6*x(x-42)<<24|255<<16|0<<8|255);
 	}
 	else if (85<x && x<=127){
-		storeRGB[0] = 0;
-		storeRGB[1] = 255;
-		storeRGB[2] = 6*(x-85);
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 0;
+		//storeRGB[1] = 255;
+		//storeRGB[2] = 6*(x-85);
+                return (0<<24|255<<16|(6*(x-85))<<8|255);
 	}
 	else if (127<x && x<=170){
-		storeRGB[0] = 0;
-		storeRGB[1] = 255-6*(x-127);
-		storeRGB[2] = 255;
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 0;
+		//storeRGB[1] = 255-6*(x-127);
+		//storeRGB[2] = 255;
+                return (0<<24|255-6*(x-127)<<16|255<<8|255);
 	}
 	else if (170<x && x<=212){
-		storeRGB[0] = 6*(x-170);
-		storeRGB[1] = 0;
-		storeRGB[2] = 255;
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 6*(x-170);
+		//storeRGB[1] = 0;
+		//storeRGB[2] = 255;
+                return (6*(x-170)<<24|0<<16|255<<8|255);
 	}
 	else if (212<x && x<=255){
-		storeRGB[0] = 255;
-		storeRGB[1] = 0;
-		storeRGB[2] = 255-6*(x-212);
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 255;
+		//storeRGB[1] = 0;
+		//storeRGB[2] = 255-6*(x-212);
+                return (255<<24|0<<16|255-6*(x-212)<<8|255);
 	}
 	else{
-		storeRGB[0] = 0;
-		storeRGB[1] = 0;
-		storeRGB[2] = 0;
-                return strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+		//storeRGB[0] = 0;
+		//storeRGB[1] = 0;
+		//storeRGB[2] = 0;
+                return (0<<24|0<<16|0<<8|0);
 		//this is incase of impossible error, sets to off/black, but error should never be reached because of inability to exceed 255 in 8 bits
 	{
 }
@@ -259,13 +259,13 @@ void colorWipe(unsigned int color)//wipes strip to one color
 {
   getRGB(color);
   for (int z = 0; z < strip.numPixels(); z++){
-    strip.setPixelColor(z, strip.Color(storeRGB[0], storeRGB[1], storeRGB[2]);
+    strip.setPixelColor(z, strip.Color(getRGB(color));
     strip.show(); //req'd to update strip?
   } 
 }
 
 //Function to set effect, should be called after everything else in paramEval because it contains overrides of color and section values depending on effect
-void setEffect(unsigned int effect, unsigned int color)
+void setEffect(unsigned int effect, uint32_t color, int duration)
 {
 	switch(effect){
 		case 0:
@@ -273,19 +273,22 @@ void setEffect(unsigned int effect, unsigned int color)
 			break; //so only sets section and color
 		case 1:
 			//slow flash, 2x per second
-                        while(true)
+                        int cycles = 0;
+                        while(cycles<duration*2)
                         {
                            colorWipe(color);
                            delay(.5); //half a second delay, so 2x per second, not sure if function can take floating point 
-                           //set to off somehow
-                        } //need to find way to break loop
+                           //set to off
+                           cycles+=1;
+                        }
 			break;
 		case 2:
+                        int cycles = 0;
 			//fast flash, 6x per second
-                        while(true){
+                        while(cycles<duration*6){
                           colorWipe(color);
                          delay(.166); //six times per second
-                        //set to off somehow 
+                        cycles+=1;
                         }
 			break;
 		case 3:
