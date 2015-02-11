@@ -1,3 +1,5 @@
+#include <Adafruit_NeoPixel.h>
+
 // This code written by Mark Crawford for FRC Team 2158 
 // Coded during the 2015 build season for Recycle Rush
 // Go AusTIN CANs!!!
@@ -76,7 +78,7 @@
 // 0=Nothing (except optional divider display)
 // 1=Run chosen IDLESHOW
 // 2=Light all LEDs to STARTCOLOR
-#define STARTWITHSHOW 0
+#define STARTWITHSHOW 1
 #define STARTCOLOR 0x00FFFF // Color to have all LEDs lit to upon boot (if set in STARTWITHSHOW) (default: Cyan)
 
 #define BRIGHTNESS 50 // Global brightness percentage (a lower the value is better on your battery but potentially harder to see)
@@ -89,14 +91,14 @@
 // Uncomment ONE, and only ONE, of the following two define lines (UART or I2C) to specify the Arduino serial input to be used
 // If both are uncommented, no testing has been performed and bugs are more likely, though it may work fine
 #define UART
-//#define I2C
+#define I2C
 
 // Set parameters for the input types here as needed
 #define UART_SPEED 115200   // Ignored if UART input isn't used
 #define I2C_SLAVE_ADDR 0x10 // Ignored if I2C input isn't used
 
 // Tell me about your WS2812 light strip
-#define NPIXEL 30  // How many pixels on the LED strip
+#define NPIXEL 40  // How many pixels on the LED strip
 #define LED_PIN 6  // What Arduino pin is connected to the data line of the LED strip?
                    // This is always Pin 6 if using the LED header of the REX Robotics RioDuino.
 
@@ -106,14 +108,14 @@
 // 1=Cylon Eye effect going up and down the string
 // 2=Cylon Eye effect going only one direction, then wrapping back to the start of the string
 // 3=Breathing effect using brightness increase/decrease and a single color
-#define IDLESHOW 1
+#define IDLESHOW 0
 
 
 // Things that control the look of the Cylon Eye effects (ignored if Cylon effects not used)
 #define CYLONCOLOR1 0xFFFF00 // Center pixel color
 #define CYLONCOLOR2 0x444400 // 2 pixels each side of center (usually just a dimmer version of the center color)
 #define CYLONCOLOR3 0x0a0a00 // Background pixels (all pixels not the "eye"
-#define CYLONSPEED 80 // Inverse speed, lower = faster (actually a loop delay in millisec)
+#define CYLONSPEED 200 // Inverse speed, lower = faster (actually a loop delay in millisec)
 
 // Things that control the look of the Breathing effect (ignored if breathing effect not used)
 #define BREATHCOLOR 0xFFFF00
@@ -190,43 +192,43 @@ boolean commsProtocol(byte x) //returns boolean, so an if could check whether or
 	}
 }
 
-uint32_t getRGB(unsigned int x) //where x is the color val, function converts single value to RGB, three values, maps to outside of color wheel
+uint32_t getRGB(unsigned int RGB) //where x is the color val, function converts single value to RGB, three values, maps to outside of color wheel
 { //wrote more effecient version that travels in a "color triangle" but still gets an accurate color in
-	if (0<=x && x<=42){
+	if (0<=RGB && RGB<=42){
 		//storeRGB[0] = 255;
 		//storeRGB[1] = 6*x;
 		//storeRGB[2] = 0;
-                return (255<<24|(6*x)<<16|0<<8|255);
+                return (255<<24|(6*RGB)<<16|0<<8|255);
 	}
-	else if (42<x && x<=85){
+	else if (42<RGB && RGB<=85){
 		//storeRGB[0] = 255-6*(x-42);
 		//storeRGB[1] = 255;
 		//storeRGB[2] = 0;
-                return ((255-6*x(x-42)<<24|255<<16|0<<8|255);
+                return ((255-6*RGB*(RGB-42)<<24|255<<16|0<<8|255));
 	}
-	else if (85<x && x<=127){
+	else if (85<RGB && RGB<=127){
 		//storeRGB[0] = 0;
 		//storeRGB[1] = 255;
 		//storeRGB[2] = 6*(x-85);
-                return (0<<24|255<<16|(6*(x-85))<<8|255);
+                return (0<<24|255<<16|(6*(RGB-85))<<8|255);
 	}
-	else if (127<x && x<=170){
+	else if (127<RGB && RGB<=170){
 		//storeRGB[0] = 0;
 		//storeRGB[1] = 255-6*(x-127);
 		//storeRGB[2] = 255;
-                return (0<<24|255-6*(x-127)<<16|255<<8|255);
+                return (0<<24|255-6*(RGB-127)<<16|255<<8|255);
 	}
-	else if (170<x && x<=212){
+	else if (170<RGB && RGB<=212){
 		//storeRGB[0] = 6*(x-170);
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 255;
-                return (6*(x-170)<<24|0<<16|255<<8|255);
+                return (6*(RGB-170)<<24|0<<16|255<<8|255);
 	}
-	else if (212<x && x<=255){
+	else if (212<RGB && RGB<=255){
 		//storeRGB[0] = 255;
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 255-6*(x-212);
-                return (255<<24|0<<16|255-6*(x-212)<<8|255);
+                return (255<<24|0<<16|255-6*(RGB-212)<<8|255);
 	}
 	else{
 		//storeRGB[0] = 0;
@@ -234,7 +236,7 @@ uint32_t getRGB(unsigned int x) //where x is the color val, function converts si
 		//storeRGB[2] = 0;
                 return (0<<24|0<<16|0<<8|0);
 		//this is incase of impossible error, sets to off/black, but error should never be reached because of inability to exceed 255 in 8 bits
-	{
+	}
 }
 
 void loop() {
@@ -243,13 +245,11 @@ void loop() {
   if (Serial.available() > 0) {
     // read the oldest byte in the serial buffer:
     byte incomingByte = Serial.read();
-	if(commsProtocol(incomingByte) == true){
-		paramEval(storedValues[0], storedValues[1], storedValues[2]);
-	}
-	else {
-		//do nothing
-	}
+    if(commsProtocol(incomingByte) == true){
+      paramEval(storedValues[0], storedValues[1], storedValues[2]);
+    }
   }
+  Serial.println("In main loop");
 #endif
   delay(10);
   strip.show();
@@ -257,9 +257,11 @@ void loop() {
 
 void colorWipe(unsigned int color)//wipes strip to one color
 {
-  getRGB(color);
+  byte one = 0x0000FF&getRGB(color);
+  byte two = (0x00FF00&getRGB(color))>>8;
+  byte three = (0xFF0000&getRGB(color))>>16;
   for (int z = 0; z < strip.numPixels(); z++){
-    strip.setPixelColor(z, strip.Color(getRGB(color));
+    strip.setPixelColor(z, strip.Color(three,two,one));
     strip.show(); //req'd to update strip?
   } 
 }
@@ -267,13 +269,13 @@ void colorWipe(unsigned int color)//wipes strip to one color
 //Function to set effect, should be called after everything else in paramEval because it contains overrides of color and section values depending on effect
 void setEffect(unsigned int effect, uint32_t color, int duration)
 {
-	switch(effect){
-		case 0:
-			
+	int cycles=0;
+          switch(effect){
+                case 0:
 			break; //so only sets section and color
 		case 1:
 			//slow flash, 2x per second
-                        int cycles = 0;
+                        
                         while(cycles<duration*2)
                         {
                            colorWipe(color);
@@ -283,7 +285,7 @@ void setEffect(unsigned int effect, uint32_t color, int duration)
                         }
 			break;
 		case 2:
-                        int cycles = 0;
+                        
 			//fast flash, 6x per second
                         while(cycles<duration*6){
                           colorWipe(color);
@@ -317,8 +319,8 @@ void setEffect(unsigned int effect, uint32_t color, int duration)
 			break;
 		case 15:
 			//Cylon eye
-			break:
-		case default:
+			break;
+		default:
 			break;
 	}
 }
@@ -367,7 +369,7 @@ void paramEval(unsigned int section, unsigned int effect, unsigned int color) {
       doInitDisplay();
     }
     break;
-  case default:
+  default:
 	break;
   }
 }
@@ -382,8 +384,6 @@ void setSection (int section, uint32_t color) { //defines where sections start a
     }
   }
 }
-
-
 
 void initDividers() {
   for(int i=0; i<NPIXEL; i++) {
@@ -415,8 +415,10 @@ void receiveEvent(int howMany)
   dropInitDisplay=1;
   while(Wire.available()) // loop through all but the last
   {
-    int x = Wire.read(); // receive byte as a character
-    paramEval(x); 
+    byte incomingByte = Wire.read(); // receive byte as a character
+    if(commsProtocol(incomingByte) == true){
+      paramEval(storedValues[0], storedValues[1], storedValues[2]);
+    }
   }
 }
 #endif
@@ -472,6 +474,7 @@ void doInitDisplay() {
 // Rinse and repeat
 // ... Think "Night Rider"
 void doInitDisplay() {
+  boolean pinFlash;
   if (dropInitDisplay) { 
     return; 
   }
@@ -522,6 +525,14 @@ void doInitDisplay() {
       strip.setPixelColor(i+3, CYLONCOLOR3); //Clears the dots to the BG color
       strip.show();
       delay(CYLONSPEED);
+      if (pinFlash) {
+        digitalWrite(13,0);
+        pinFlash=0;
+      }
+      else {
+        digitalWrite(13,1);
+        pinFlash=1;
+      }
     }
   }
 }
