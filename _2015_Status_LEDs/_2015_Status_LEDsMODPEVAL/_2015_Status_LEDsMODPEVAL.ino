@@ -95,7 +95,7 @@
 
 // Set parameters for the input types here as needed
 #define UART_SPEED 115200   // Ignored if UART input isn't used
-#define I2C_SLAVE_ADDR 0x10 // Ignored if I2C input isn't used
+#define I2C_SLAVE_ADDR 0x11 // Ignored if I2C input isn't used
 
 // Tell me about your WS2812 light strip
 #define NPIXEL 40  // How many pixels on the LED strip
@@ -104,11 +104,11 @@
 
 // Choose which Idle time LED show/effect is used
 // This can be run in two possible ways: At Arduino boot (see STARTWITHSHOW), or by passing the character 'Z' into the input
-// 0=None, all LEDs are off except for (optional) section dividers. Can be used by way of 'Z' char to reset all sections to black.
+// 0=None, all LEDs are off except for (optional) section dividers. Can be used by way of 'Z' char to reset all sections to black.  
 // 1=Cylon Eye effect going up and down the string
 // 2=Cylon Eye effect going only one direction, then wrapping back to the start of the string
 // 3=Breathing effect using brightness increase/decrease and a single color
-#define IDLESHOW 0
+#define IDLESHOW 3
 
 
 // Things that control the look of the Cylon Eye effects (ignored if Cylon effects not used)
@@ -143,10 +143,11 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800); //initializes the strip, as seen in example code
 boolean dropInitDisplay=0;
 unsigned int storedValues[3] = {}; //stores values from communcation protocol
+uint32_t white = 0b11111111111111111111111111111111;
 //unsigned int storeRGB[3] = {}; //values stored in this array by function getRGB(), order R, G, B
 //4 strips, one on each side of robot. Strip does not need to be specified, all strips show the same output
-//Section needs to be specified on each strip, section is an arbitrary number which forty is a multiple of, this should be done in the setSection() function already
-
+//Section needs to be specified on each strip, section is an arbitrary number which forty is a multiple of, this should be done in the setSectionColor() function already
+void setSectionColor(unsigned int, uint32_t); 
 
 void setup() {
 #ifdef UART
@@ -198,7 +199,7 @@ uint32_t getRGB(unsigned int RGB) //where x is the color val, function converts 
 		//storeRGB[0] = 255;
 		//storeRGB[1] = 6*x;
 		//storeRGB[2] = 0;
-                return (255<<24|(6*RGB)<<16|0<<8|255);
+                return strip.Color(255,6*RGB,0);
 	}
 	else if (42<RGB && RGB<=85){
 		//storeRGB[0] = 255-6*(x-42);
@@ -224,7 +225,7 @@ uint32_t getRGB(unsigned int RGB) //where x is the color val, function converts 
 		//storeRGB[2] = 255;
                 return (6*(RGB-170)<<24|0<<16|255<<8|255);
 	}
-	else if (212<RGB && RGB<=255){
+	else if (212<RGB && RGB<=254){
 		//storeRGB[0] = 255;
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 255-6*(x-212);
@@ -239,6 +240,7 @@ uint32_t getRGB(unsigned int RGB) //where x is the color val, function converts 
 	}
 }
 
+unsigned long lastMillis = millis(); //necessary for flashing functions
 void loop() {
 #ifdef UART  
   // see if there's incoming serial data:
@@ -249,58 +251,66 @@ void loop() {
       paramEval(storedValues[0], storedValues[1], storedValues[2]);
     }
   }
-  Serial.println("In main loop");
 #endif
+//  colorWipe(getRGB(41));
   delay(10);
   strip.show();
 }
 
-void colorWipe(unsigned int color)//wipes strip to one color
+void colorWipe(uint32_t color)//wipes strip to one color, where color is the result of getRGB()
 {
-  byte one = 0x0000FF&getRGB(color);
-  byte two = (0x00FF00&getRGB(color))>>8;
-  byte three = (0xFF0000&getRGB(color))>>16;
   for (int z = 0; z < strip.numPixels(); z++){
-    strip.setPixelColor(z, strip.Color(three,two,one));
-    strip.show(); //req'd to update strip?
+    strip.setPixelColor(z, color);
   } 
+  strip.show(); //updates strip
 }
 
+
+
 //Function to set effect, should be called after everything else in paramEval because it contains overrides of color and section values depending on effect
-void setEffect(unsigned int effect, uint32_t color, int duration)
+void updateEffect(unsigned int effect, uint32_t color, unsigned int section) //where color is a result of getRGB()
 {
-	int cycles=0;
+          static boolean toggle;
+          unsigned long temp = millis();
           switch(effect){
-                case 0:
+                case 0: //slow flash
+                        if ((temp-lastMillis) > 500){
+                          lastMillis = temp;
+                          if (toggle){
+                           toggle = false;
+                           setSectionColor(section, getRGB(256)); //256 forces error in getRGB, making getRGB return 0 0 0, which turns LEDs off 
+                          }
+                         else {
+                          toggle = true;
+                          setSectionColor(section, color);//because flashing only targets first section
+                         }
+                        }
 			break; //so only sets section and color
-		case 1:
-			//slow flash, 2x per second
-                        
-                        while(cycles<duration*2)
-                        {
-                           colorWipe(color);
-                           delay(.5); //half a second delay, so 2x per second, not sure if function can take floating point 
-                           //set to off
-                           cycles+=1;
+		case 1: //fast flash, critical error
+                        if ((temp-lastMillis) > 166){
+                          lastMillis = temp;
+                          if (toggle){
+                           toggle = false;
+                           setSectionColor(section, getRGB(256)); //256 forces error in getRGB, making getRGB return 0 0 0, which turns LEDs off 
+                          }
+                         else {
+                          toggle = true;
+                          setSectionColor(section, color);//because flashing only targets first section
+                         }
                         }
 			break;
-		case 2:
-                        
-			//fast flash, 6x per second
-                        while(cycles<duration*6){
-                          colorWipe(color);
-                         delay(.166); //six times per second
-                        cycles+=1;
-                        }
+		case 2: //set specified section to solid color
+                        setSectionColor(section, color);
 			break;
-		case 3:
-			//red-yellow-green gradient, overrides color val
+		case 3: //set entire strip to solid color
+			colorWipe(color);
 			break;
 		case 4:
-			//magenta-white gradient
+			//sweep
+                        //every tenth of a second, turn previous LED off and next LED on
 			break;
 		case 9:
-			//up-down zip
+			//sleep breathing (fade in and out, use transparency)
 			break;
 		case 10:
 			//Single Direction/FollowingZip
@@ -329,39 +339,39 @@ void setEffect(unsigned int effect, uint32_t color, int duration)
 
 // This function always processes input for 5 input ranges/display sections
 // MAC: low priority: Look at pre-compile directives to only run the code for the defined number of sections
-void paramEval(unsigned int section, unsigned int effect, unsigned int color) {
+void paramEval(unsigned int section, unsigned int effect, uint32_t color) {
   // Figure out which color should be assigned and set the designated section to that color
   //determine effect after section and color assignment because of the black or white effects that will be required due to lack of three byte RGB value
   switch(section) {
   case 0:
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 1: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 2: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 3: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 4: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 5: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 6: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 7: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 8: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 9: 
-    setSection(section, color);
+    setSectionColor(section, color);
     break;
   case 12: //what is this case for
     if (section == 4) { // This corresponds to a 'Z' character being received
@@ -374,12 +384,12 @@ void paramEval(unsigned int section, unsigned int effect, unsigned int color) {
   }
 }
 
-void setSection (int section, uint32_t color) { //defines where sections start and end, ask mark about the color variable here
+void setSectionColor(unsigned int section, uint32_t color) { //defin
   if (section < SECTIONS) { // Don't do anything if we're told to affect a section that shouldn't exist
     int sectionLength=(NPIXEL / SECTIONS);
     int sectionStart=sectionLength*section;
     int sectionEnd=(sectionLength*(section+1))-DIVIDERS;
-    for(uint16_t i=sectionStart; i<sectionEnd; i++) {
+    for(uint16_t i=sectionStart; i<sectionEnd; i++) { //sets every pixel in section to color
       strip.setPixelColor(i, color);
     }
   }
@@ -413,10 +423,18 @@ void receiveEvent(int howMany)
     initDividers();
   }
   dropInitDisplay=1;
+  Serial.println("Got I2C Data");
   while(Wire.available()) // loop through all but the last
   {
     byte incomingByte = Wire.read(); // receive byte as a character
+    Serial.println("Got I2C Byte");
     if(commsProtocol(incomingByte) == true){
+      Serial.print("Setting: ");
+      Serial.print(storedValues[0]);
+      Serial.print(" ");
+      Serial.print(storedValues[1]);
+      Serial.print(" ");
+      Serial.println(storedValues[2]);
       paramEval(storedValues[0], storedValues[1], storedValues[2]);
     }
   }
