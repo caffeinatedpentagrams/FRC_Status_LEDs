@@ -143,11 +143,11 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NPIXEL, LED_PIN, NEO_GRB + NEO_KHZ800); //initializes the strip, as seen in example code
 boolean dropInitDisplay=0;
 unsigned int storedValues[3] = {}; //stores values from communcation protocol
-uint32_t white = 0b11111111111111111111111111111111;
 //unsigned int storeRGB[3] = {}; //values stored in this array by function getRGB(), order R, G, B
 //4 strips, one on each side of robot. Strip does not need to be specified, all strips show the same output
 //Section needs to be specified on each strip, section is an arbitrary number which forty is a multiple of, this should be done in the setSectionColor() function already
 void setSectionColor(unsigned int, uint32_t); 
+void updateEffect(unsigned int section, unsigned int effect, uint32_t color); //where color is a result of getRGB
 
 void setup() {
 #ifdef UART
@@ -205,38 +205,45 @@ uint32_t getRGB(unsigned int RGB) //where x is the color val, function converts 
 		//storeRGB[0] = 255-6*(x-42);
 		//storeRGB[1] = 255;
 		//storeRGB[2] = 0;
-                return ((255-6*RGB*(RGB-42)<<24|255<<16|0<<8|255));
+                //return ((255-6*RGB*(RGB-42)<<24|255<<16|0<<8|255));
+                return strip.Color(255-6*(RGB-42), 255,0);
 	}
 	else if (85<RGB && RGB<=127){
 		//storeRGB[0] = 0;
 		//storeRGB[1] = 255;
 		//storeRGB[2] = 6*(x-85);
-                return (0<<24|255<<16|(6*(RGB-85))<<8|255);
+                //return (0<<24|255<<16|(6*(RGB-85))<<8|255);
+                return strip.Color(0, 255, 6*(RGB-85));
 	}
 	else if (127<RGB && RGB<=170){
 		//storeRGB[0] = 0;
 		//storeRGB[1] = 255-6*(x-127);
 		//storeRGB[2] = 255;
-                return (0<<24|255-6*(RGB-127)<<16|255<<8|255);
-	}
+                //return (0<<24|255-6*(RGB-127)<<16|255<<8|255);
+                return strip.Color(0, 255-6*(RGB-127), 255);
+        }
 	else if (170<RGB && RGB<=212){
 		//storeRGB[0] = 6*(x-170);
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 255;
-                return (6*(RGB-170)<<24|0<<16|255<<8|255);
+                //return (6*(RGB-170)<<24|0<<16|255<<8|255);
+                return strip.Color(6*(RGB-170), 0, 255);
 	}
 	else if (212<RGB && RGB<=254){
 		//storeRGB[0] = 255;
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 255-6*(x-212);
-                return (255<<24|0<<16|255-6*(RGB-212)<<8|255);
+                //return (255<<24|0<<16|255-6*(RGB-212)<<8|255);
+                return strip.Color(255, 0, 255-6*(RGB-212));
 	}
 	else{
 		//storeRGB[0] = 0;
 		//storeRGB[1] = 0;
 		//storeRGB[2] = 0;
-                return (0<<24|0<<16|0<<8|0);
+                //return (0<<24|0<<16|0<<8|0);
+                return strip.Color(0, 0, 0);
 		//this is incase of impossible error, sets to off/black, but error should never be reached because of inability to exceed 255 in 8 bits
+                //also, forcing an error by passing the function a number greater than 254 will set the color to black, or off.
 	}
 }
 
@@ -247,12 +254,15 @@ void loop() {
   if (Serial.available() > 0) {
     // read the oldest byte in the serial buffer:
     byte incomingByte = Serial.read();
-    if(commsProtocol(incomingByte) == true){
-      paramEval(storedValues[0], storedValues[1], storedValues[2]);
+    if(commsProtocol(incomingByte)){ //commsProtocol returns bool, so if a message is received, then do stuff
+      //paramEval(storedValues[0], storedValues[1], storedValues[2]); obsolete function
+      
+      
     }
   }
 #endif
 //  colorWipe(getRGB(41));
+  updateEffect(storedValues[0], storedValues[1], getRGB(storedValues[2]));
   delay(10);
   strip.show();
 }
@@ -268,10 +278,13 @@ void colorWipe(uint32_t color)//wipes strip to one color, where color is the res
 
 
 //Function to set effect, should be called after everything else in paramEval because it contains overrides of color and section values depending on effect
-void updateEffect(unsigned int effect, uint32_t color, unsigned int section) //where color is a result of getRGB()
+void updateEffect(unsigned int section, unsigned int effect, uint32_t color) //where color is a result of getRGB()
 {
           static boolean toggle;
           unsigned long temp = millis();
+          int sectionLength=(NPIXEL / SECTIONS);
+          int sectionStart=sectionLength*section; //cp'd setSectionColor() code in the event that a sweep should only effect a single section
+          int sectionEnd=(sectionLength*(section+1))-DIVIDERS;
           switch(effect){
                 case 0: //slow flash
                         if ((temp-lastMillis) > 500){
@@ -306,9 +319,29 @@ void updateEffect(unsigned int effect, uint32_t color, unsigned int section) //w
 			colorWipe(color);
 			break;
 		case 4:
-			//sweep
+                        for(uint16_t i=sectionStart; i<sectionEnd;) { //sets every pixel in section to color
+                          strip.setPixelColor(i, color);
+                          if (i>0)
+                            strip.setPixelColor(i-1, getRGB(256)); //returns off previous pixel, except on first pass
+                          if (temp-lastMillis > 100){
+                            lastMillis = temp;
+                            i++; //only increases i if 100 miliseconds has passed
+                          }
+                        }
                         //every tenth of a second, turn previous LED off and next LED on
 			break;
+                case 5:
+                        //full strip sweep
+                        for(int i=0; i < strip.numPixels();){
+                          strip.setPixelColor(i, color);
+                          if(i>0)
+                            strip.setPixelColor(i-1, getRGB(256));
+                          if (temp-lastMillis > 100){ //turns of prev pix
+                           lastMillis = temp;
+                           i++;
+                          }
+                        }
+                        break;
 		case 9:
 			//sleep breathing (fade in and out, use transparency)
 			break;
@@ -336,7 +369,7 @@ void updateEffect(unsigned int effect, uint32_t color, unsigned int section) //w
 }
 
 
-
+//This function will never be called
 // This function always processes input for 5 input ranges/display sections
 // MAC: low priority: Look at pre-compile directives to only run the code for the defined number of sections
 void paramEval(unsigned int section, unsigned int effect, uint32_t color) {
