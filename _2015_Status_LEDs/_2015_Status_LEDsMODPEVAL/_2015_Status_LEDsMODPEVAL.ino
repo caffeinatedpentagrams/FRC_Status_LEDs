@@ -1,5 +1,3 @@
-#include <Adafruit_NeoPixel.h>
-
 // This code written by Mark Crawford for FRC Team 2158 
 // Coded during the 2015 build season for Recycle Rush
 // Go AusTIN CANs!!!
@@ -95,7 +93,7 @@
 
 // Set parameters for the input types here as needed
 #define UART_SPEED 115200   // Ignored if UART input isn't used
-#define I2C_SLAVE_ADDR 0x11 // Ignored if I2C input isn't used
+#define I2C_SLAVE_ADDR 0x10 // Ignored if I2C input isn't used
 
 // Tell me about your WS2812 light strip
 #define NPIXEL 40  // How many pixels on the LED strip
@@ -108,14 +106,14 @@
 // 1=Cylon Eye effect going up and down the string
 // 2=Cylon Eye effect going only one direction, then wrapping back to the start of the string
 // 3=Breathing effect using brightness increase/decrease and a single color
-#define IDLESHOW 3
+#define IDLESHOW 1
 
 
 // Things that control the look of the Cylon Eye effects (ignored if Cylon effects not used)
 #define CYLONCOLOR1 0xFFFF00 // Center pixel color
 #define CYLONCOLOR2 0x444400 // 2 pixels each side of center (usually just a dimmer version of the center color)
 #define CYLONCOLOR3 0x0a0a00 // Background pixels (all pixels not the "eye"
-#define CYLONSPEED 200 // Inverse speed, lower = faster (actually a loop delay in millisec)
+#define CYLONSPEED 50 // Inverse speed, lower = faster (actually a loop delay in millisec)
 
 // Things that control the look of the Breathing effect (ignored if breathing effect not used)
 #define BREATHCOLOR 0xFFFF00
@@ -157,6 +155,7 @@ void setup() {
   Wire.begin(I2C_SLAVE_ADDR);
   Wire.onReceive(receiveEvent); // register event
 #endif
+  pinMode(13,OUTPUT);
   strip.begin();
   strip.setBrightness(255*(BRIGHTNESS/100.001));
   strip.show();
@@ -255,7 +254,7 @@ void loop() {
     // read the oldest byte in the serial buffer:
     byte incomingByte = Serial.read();
     if(commsProtocol(incomingByte)){ //commsProtocol returns bool, so if a message is received, then do stuff
-      //paramEval(storedValues[0], storedValues[1], storedValues[2]); obsolete function
+  //    paramEval(storedValues[0], storedValues[1], storedValues[2]); //obsolete function
       
       
     }
@@ -452,22 +451,22 @@ void initDividers() {
 // this function is registered as an event, see setup()
 void receiveEvent(int howMany)
 {
+//  Serial.println("Got I2C Data");
   if (! dropInitDisplay) {
     initDividers();
   }
   dropInitDisplay=1;
-  Serial.println("Got I2C Data");
   while(Wire.available()) // loop through all but the last
   {
     byte incomingByte = Wire.read(); // receive byte as a character
-    Serial.println("Got I2C Byte");
+//    Serial.println("Got I2C Byte");
     if(commsProtocol(incomingByte) == true){
-      Serial.print("Setting: ");
+/*      Serial.print("Setting: ");
       Serial.print(storedValues[0]);
       Serial.print(" ");
       Serial.print(storedValues[1]);
       Serial.print(" ");
-      Serial.println(storedValues[2]);
+      Serial.println(storedValues[2]); */
       paramEval(storedValues[0], storedValues[1], storedValues[2]);
     }
   }
@@ -509,11 +508,25 @@ void doInitColor() {
 #if IDLESHOW == 0
 
 // This is the code called when no Idle show/effect is desired
-void doInitDisplay() {
+/*void doInitDisplay() {
   if (dropInitDisplay) { 
     return; 
   }
   initDividers();
+} */
+void doInitDisplay() {
+  boolean pinFlash;
+  while(true) {
+      delay(50);
+      if (pinFlash) {
+        digitalWrite(13,0);
+        pinFlash=false;
+      }
+      else {
+        digitalWrite(13,1);
+        pinFlash=true;
+      }
+    }
 }
 
 // End No effect/show
@@ -578,11 +591,11 @@ void doInitDisplay() {
       delay(CYLONSPEED);
       if (pinFlash) {
         digitalWrite(13,0);
-        pinFlash=0;
+        pinFlash=false;
       }
       else {
         digitalWrite(13,1);
-        pinFlash=1;
+        pinFlash=true;
       }
     }
   }
