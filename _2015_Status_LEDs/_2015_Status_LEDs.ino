@@ -76,7 +76,7 @@
 // 0=Nothing (except optional divider display)
 // 1=Run chosen IDLESHOW
 // 2=Light all LEDs to STARTCOLOR
-#define STARTWITHSHOW 0
+#define STARTWITHSHOW 1
 #define STARTCOLOR 0x00FFFF // Color to have all LEDs lit to upon boot (if set in STARTWITHSHOW) (default: Cyan)
 
 #define BRIGHTNESS 50 // Global brightness percentage (a lower the value is better on your battery but potentially harder to see)
@@ -89,7 +89,7 @@
 // Uncomment ONE, and only ONE, of the following two define lines (UART or I2C) to specify the Arduino serial input to be used
 // If both are uncommented, no testing has been performed and bugs are more likely, though it may work fine
 #define UART
-//#define I2C
+#define I2C
 
 // Set parameters for the input types here as needed
 #define UART_SPEED 115200   // Ignored if UART input isn't used
@@ -143,6 +143,7 @@ boolean dropInitDisplay=0;
 
 
 void setup() {
+  pinMode(13,OUTPUT);
 #ifdef UART
   Serial.begin(UART_SPEED);
 #endif
@@ -162,7 +163,7 @@ void setup() {
 #endif
 }
 
-void commsProtocol(byte x)
+/*void commsProtocol(byte x)
 {
 	static word buffer;
 	static word process; //figure out how to do conversion from byte data type to int data type
@@ -184,7 +185,8 @@ void commsProtocol(byte x)
 	else {
 		buffer = (buffer<<8) | x; //shift left 8, the OR over x;
 	}
-{
+} */
+
 void loop() {
 #ifdef UART  
   // see if there's incoming serial data:
@@ -298,7 +300,7 @@ void initDividers() {
 #ifdef I2C
 // function that executes whenever data is received from I2C master
 // this function is registered as an event, see setup()
-void receiveEvent(int howMany)
+/*void receiveEvent(int howMany)
 {
   if (! dropInitDisplay) {
     initDividers();
@@ -309,7 +311,25 @@ void receiveEvent(int howMany)
     int x = Wire.read(); // receive byte as a character
     paramEval(x); 
   }
-}
+} */
+void receiveEvent(int howMany)
+{
+//  Serial.println("Got I2C Data");
+  if (! dropInitDisplay) {
+    initDividers();
+  }
+  dropInitDisplay=1;
+  while(Wire.available()) // loop through all but the last
+  {
+    byte incomingByte = Wire.read(); // receive byte as a character
+//    Serial.println("Got I2C Byte");
+      paramEval(incomingByte);
+//      Serial.print("Setting: ");
+//      Serial.println(incomingByte);
+    }
+  }
+
+
 #endif
 
 // Funcion to wipe whole string to a specified color
@@ -347,13 +367,26 @@ void doInitColor() {
 #if IDLESHOW == 0
 
 // This is the code called when no Idle show/effect is desired
-void doInitDisplay() {
+/*void doInitDisplay() {
   if (dropInitDisplay) { 
     return; 
   }
   initDividers();
+} */
+void doInitDisplay() {
+  boolean pinFlash;
+  while(true) {
+      delay(50);
+      if (pinFlash) {
+        digitalWrite(13,0);
+        pinFlash=false;
+      }
+      else {
+        digitalWrite(13,1);
+        pinFlash=true;
+      }
+    }
 }
-
 // End No effect/show
 
 #elif IDLESHOW == 1
